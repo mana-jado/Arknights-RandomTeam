@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>明日方舟干员随机选择器</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1><i class="fas fa-dragon"></i> 明日方舟干员随机选择器</h1>
+            <p class="subtitle">上传您的干员数据JSON文件，随机选择12名干员并生成配置</p>
+        </header>
+
+        <div class="main-content">
+            <!-- 左侧：控制面板 -->
+            <div class="control-panel">
+                <div class="card">
+                    <h2><i class="fas fa-file-upload"></i> 数据加载</h2>
+                    <div class="file-upload-area" id="drop-area">
+                        <i class="fas fa-cloud-upload-alt upload-icon"></i>
+                        <p>拖放您的JSON文件到此区域，或点击选择文件</p>
+                        <input type="file" id="file-input" accept=".json">
+                        <button class="btn" id="browse-btn">选择文件</button>
+                    </div>
+                    
+                    <div class="file-info" id="file-info">
+                        <p><i class="fas fa-file-code"></i> <span id="file-name">未选择文件</span></p>
+                        <p><i class="fas fa-users"></i> 已加载干员: <span id="operator-count">0</span></p>
+                    </div>
+                    
+                    <button class="btn btn-primary" id="load-btn" disabled>
+                        <i class="fas fa-download"></i> 加载数据
+                    </button>
+                </div>
+
+                <div class="card">
+                    <h2><i class="fas fa-sliders-h"></i> 抽取设置</h2>
+                    <div class="options">
+                        <label class="checkbox-container">
+                            <input type="checkbox" id="level-weight" checked>
+                            <span class="checkmark"></span>
+                            <span class="option-text">等级权重抽取</span>
+                            <span class="option-desc">根据干员等级、精英化和稀有度计算权重进行抽取</span>
+                        </label>
+                        
+                        <label class="checkbox-container">
+                            <input type="checkbox" id="ignore-level1" checked>
+                            <span class="checkmark"></span>
+                            <span class="option-text">忽略1级干员</span>
+                            <span class="option-desc">不抽取精英0级且等级为1的干员</span>
+                        </label>
+                    </div>
+                    
+                    <button class="btn btn-primary btn-large" id="select-btn" disabled>
+                        <i class="fas fa-random"></i> 随机抽取12名干员
+                    </button>
+                    
+                    <div class="info-box">
+                        <i class="fas fa-info-circle"></i>
+                        <p>每次抽取都会重新随机选择，确保每次结果不同</p>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2><i class="fas fa-file-export"></i> 导出结果</h2>
+                    <button class="btn btn-success" id="save-btn" disabled>
+                        <i class="fas fa-save"></i> 保存为JSON文件
+                    </button>
+                    
+                    <div class="export-info">
+                        <p><i class="fas fa-code"></i> 生成格式符合PRTS.ME标准</p>
+                        <p><i class="fas fa-history"></i> 仅保留最后一次抽取结果</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 右侧：结果显示 -->
+            <div class="result-panel">
+                <div class="card">
+                    <div class="result-header">
+                        <h2><i class="fas fa-list-alt"></i> 抽取结果</h2>
+                        <div class="result-stats">
+                            <span class="stat"><i class="fas fa-users"></i> 已选: <span id="selected-count">0</span>/12</span>
+                            <span class="stat"><i class="fas fa-star"></i> 6星: <span id="six-star-count">0</span></span>
+                        </div>
+                    </div>
+                    
+                    <div class="operators-grid" id="operators-grid">
+                        <!-- 这里将动态生成干员卡片 -->
+                        <div class="empty-state">
+                            <i class="fas fa-users-slash"></i>
+                            <p>加载数据后点击"随机抽取"开始选择干员</p>
+                        </div>
+                    </div>
+                    
+                    <div class="result-actions">
+                        <button class="btn btn-secondary" id="clear-btn" disabled>
+                            <i class="fas fa-trash"></i> 清除结果
+                        </button>
+                        <div class="skill-legend">
+                            <span class="legend-item"><span class="skill-badge skill-1">1</span> 技能1</span>
+                            <span class="legend-item"><span class="skill-badge skill-2">2</span> 技能2</span>
+                            <span class="legend-item"><span class="skill-badge skill-3">3</span> 技能3</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card json-preview">
+                    <h2><i class="fas fa-file-code"></i> JSON 预览</h2>
+                    <div class="json-container">
+                        <pre id="json-output">{
+  "stage_name": "1-7",
+  "minimum_required": "v4.0.0",
+  "doc": {
+    "title": "随机抽取干员配置",
+    "details": "等待抽取结果..."
+  },
+  "opers": [],
+  "groups": [],
+  "actions": [],
+  "version": 3,
+  "difficulty": 3
+}</pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <footer class="footer">
+            <p>© 2026 明日方舟干员选择器 | 数据格式参考PRTS.ME | 仅供娱乐使用</p>
+            <p class="tips"><i class="fas fa-lightbulb"></i> 提示: 确保JSON文件格式正确，且包含干员的name、elite、level、rarity等字段</p>
+        </footer>
+    </div>
+
+    <!-- 加载动画 -->
+    <div class="loader" id="loader">
+        <div class="loader-content">
+            <div class="loader-spinner"></div>
+            <p>正在处理数据...</p>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
