@@ -297,15 +297,17 @@ function loadOperatorImage(operator, callback) {
 }
 
 function getPlaceholderImage(operator) {
-    return `data:image/svg+xml;base64,${btoa(`
-        <svg width="180" height="240" xmlns="http://www.w3.org/2000/svg">
-            <rect width="100%" height="100%" fill="#1a1a2e"/>
-            <rect x="0" y="0" width="100%" height="20" fill="#2a2a3a"/>
-            <text x="50%" y="50%" font-family="Arial" font-size="16" fill="#8080a0" text-anchor="middle" dy=".3em">
-                ${operator.name}
-            </text>
-        </svg>
-    `)}`;
+    // 使用 encodeURIComponent 处理中文
+    const svg = `<svg width="180" height="240" xmlns="http://www.w3.org/2000/svg">
+        <rect width="100%" height="100%" fill="#1a1a2e"/>
+        <rect x="0" y="0" width="100%" height="20" fill="#2a2a3a"/>
+        <text x="50%" y="50%" font-family="Arial" font-size="16" fill="#8080a0" text-anchor="middle" dy=".3em">
+            ${operator.name}
+        </text>
+    </svg>`;
+    
+    // 使用 encodeURIComponent 而不是 btoa
+    return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
 }
 
 // 3.4: 修改现有的加载干员数据函数（可选保留，但不再使用）
@@ -524,60 +526,46 @@ function updateResultsDisplay() {
     }
     
     selectedOperators.forEach((operator, index) => {
-        operatorsGrid.innerHTML = '';
-    
-        if (selectedOperators.length === 0) {
-            operatorsGrid.innerHTML = `
-                <div class="empty-state">
-                    <i class="fas fa-users-slash"></i>
-                    <p>加载数据后点击"随机抽取"开始选择干员</p>
-                </div>
-            `;
-            return;
-        }
+        const card = document.createElement('div');
+        card.className = 'operator-card';
+        card.dataset.index = index;
         
-        selectedOperators.forEach((operator, index) => {
-            const card = document.createElement('div');
-            card.className = 'operator-card';
-            card.dataset.index = index;
-            
-            // 根据稀有度设置边框颜色
-            const rarityClass = `rarity-${operator.rarity}`;
-            card.classList.add(rarityClass);
-            
-            // 生成星级显示
-            const stars = '★'.repeat(operator.rarity);
-            
-            // 先创建卡片结构，使用占位符
-            card.innerHTML = `
-                <div class="operator-image" id="img-${index}" style="background-image: url('${getPlaceholderImage(operator)}')">
-                    <!-- 移除了图片中的技能徽章 -->
+        // 根据稀有度设置边框颜色
+        const rarityClass = `rarity-${operator.rarity}`;
+        card.classList.add(rarityClass);
+        
+        // 生成星级显示
+        const stars = '★'.repeat(operator.rarity);
+        
+        // 先创建卡片结构，使用占位符
+        card.innerHTML = `
+            <div class="operator-image" id="img-${index}" style="background-image: url('${getPlaceholderImage(operator)}')">
+                <!-- 移除了图片中的技能徽章 -->
+            </div>
+            <div class="operator-info">
+                <div class="operator-header">
+                    <div class="operator-name">${operator.name}</div>
+                    <div class="rarity-stars">${stars}</div>
+                    <div class="skill-badge skill-${operator.selectedSkill}">${operator.selectedSkill}</div>
                 </div>
-                <div class="operator-info">
-                    <div class="operator-header">
-                        <div class="operator-name">${operator.name}</div>
-                        <div class="rarity-stars">${stars}</div>
-                        <div class="skill-badge skill-${operator.selectedSkill}">${operator.selectedSkill}</div>
-                    </div>
-                    <div class="operator-details">
-                        <span class="detail-item">精英${operator.elite}</span>
-                        <span class="detail-item">Lv.${operator.level}</span>
-                    </div>
+                <div class="operator-details">
+                    <span class="detail-item">精英${operator.elite}</span>
+                    <span class="detail-item">Lv.${operator.level}</span>
                 </div>
-            `;
-            
-            operatorsGrid.appendChild(card);
-            
-            // 异步加载图片
-            setTimeout(() => {
-                loadOperatorImage(operator, (imageUrl) => {
-                    const imgElement = document.getElementById(`img-${index}`);
-                    if (imgElement) {
-                        imgElement.style.backgroundImage = `url('${imageUrl}')`;
-                    }
-                });
-            }, index * 50); // 延迟加载，避免同时发起太多请求
-        });
+            </div>
+        `;
+        
+        operatorsGrid.appendChild(card);
+        
+        // 异步加载图片
+        setTimeout(() => {
+            loadOperatorImage(operator, (imageUrl) => {
+                const imgElement = document.getElementById(`img-${index}`);
+                if (imgElement) {
+                    imgElement.style.backgroundImage = `url('${imageUrl}')`;
+                }
+            });
+        }, index * 50); // 延迟加载，避免同时发起太多请求
     });
 }
 
