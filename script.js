@@ -6,7 +6,6 @@ let operatorImages = {}; // 缓存已加载的图片
 // DOM元素
 const fileInput = document.getElementById('file-input');
 const browseBtn = document.getElementById('browse-btn');
-const loadBtn = document.getElementById('load-btn');
 const selectBtn = document.getElementById('select-btn');
 const saveBtn = document.getElementById('save-btn');
 const clearBtn = document.getElementById('clear-btn');
@@ -20,6 +19,253 @@ const dropArea = document.getElementById('drop-area');
 const levelWeightCheckbox = document.getElementById('level-weight');
 const ignoreLevel1Checkbox = document.getElementById('ignore-level1');
 const loader = document.getElementById('loader');
+const loadStatusText = document.getElementById('load-status-text'); // 3.1: 添加状态显示元素
+
+// 3.1: 添加状态更新函数
+function updateLoadStatus(message, type = 'info') {
+    if (loadStatusText) {
+        loadStatusText.textContent = message;
+        loadStatusText.className = '';
+        
+        switch (type) {
+            case 'success':
+                loadStatusText.classList.add('load-success');
+                break;
+            case 'error':
+                loadStatusText.classList.add('load-error');
+                break;
+            case 'warning':
+                loadStatusText.classList.add('load-warning');
+                break;
+            default:
+                // 保持默认样式
+                break;
+        }
+    }
+}
+
+// 加载默认全图鉴数据
+async function loadDefaultData() {
+    try {
+        updateLoadStatus('正在加载默认全图鉴数据...', 'info');
+        console.log("正在加载默认全图鉴数据...");
+        
+        // 尝试从服务器根目录加载 default_operators.json
+        const response = await fetch('default_operators.json');
+        
+        if (!response.ok) {
+            throw new Error(`HTTP错误 ${response.status}: ${response.statusText}`);
+        }
+        
+        operatorsData = await response.json();
+        
+        // 验证数据格式
+        if (!Array.isArray(operatorsData)) {
+            throw new Error('默认数据格式错误：不是有效的数组格式');
+        }
+        
+        // 确保每个干员都有正确的字段
+        const requiredFields = ['id', 'name', 'elite', 'level', 'rarity'];
+        const validOperators = [];
+        
+        for (const op of operatorsData) {
+            // 检查必要字段
+            let isValid = true;
+            for (const field of requiredFields) {
+                if (op[field] === undefined) {
+                    console.warn(`干员数据缺少字段 "${field}":`, op);
+                    isValid = false;
+                    break;
+                }
+            }
+            
+            if (isValid) {
+                // 确保own和potential字段存在
+                if (op.own === undefined) op.own = true;
+                if (op.potential === undefined) op.potential = 6;
+                validOperators.push(op);
+            }
+        }
+        
+        operatorsData = validOperators;
+        
+        if (operatorsData.length === 0) {
+            throw new Error('默认数据中没有有效的干员信息');
+        }
+        
+        // 预加载所有干员图片到缓存
+        preloadOperatorImages();
+        
+        // 更新UI
+        operatorCount.textContent = operatorsData.length;
+        fileName.textContent = "默认全图鉴数据";
+        selectBtn.disabled = operatorsData.length < 12;
+        
+        if (operatorsData.length < 12) {
+            const message = `默认数据中干员数量不足12个（当前：${operatorsData.length}）`;
+            updateLoadStatus(message, 'warning');
+            showError(message);
+        } else {
+            const message = `成功加载默认全图鉴数据！共 ${operatorsData.length} 个干员`;
+            updateLoadStatus(message, 'success');
+            showSuccess(message);
+            
+            // 自动抽取一次
+            setTimeout(() => {
+                selectRandomOperators();
+            }, 500);
+        }
+        
+    } catch (error) {
+        console.error('加载默认数据失败:', error);
+        const message = `加载默认数据失败: ${error.message}`;
+        updateLoadStatus(message, 'error');
+        showError(message);
+        
+        // 回退到空数据
+        operatorsData = [];
+        operatorCount.textContent = '0';
+        selectBtn.disabled = true;
+        fileName.textContent = "加载默认数据失败";
+        
+    } finally {
+        // 不需要隐藏加载器，因为页面初始化时没有显示加载器
+    }
+}
+
+// 3.2: 处理文件选择 - 修改为自动加载
+function handleFileSelect(event) {
+    const file = event.target.files[0];
+    if (file) {
+        fileName.textContent = file.name;
+        updateLoadStatus('正在加载数据...', 'info');
+        
+        // 自动加载文件
+        loadOperatorsDataFromFile(file);
+    }
+}
+
+// 3.2: 处理文件拖放 - 修改为自动加载
+function handleFileDrop(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    dropArea.style.borderColor = 'rgba(77, 204, 189, 0.3)';
+    dropArea.style.backgroundColor = 'transparent';
+    
+    const file = event.dataTransfer.files[0];
+    if (file && file.type === 'application/json') {
+        fileInput.files = event.dataTransfer.files;
+        fileName.textContent = file.name;
+        updateLoadStatus('正在加载数据...', 'info');
+        
+        // 自动加载文件
+        loadOperatorsDataFromFile(file);
+    } else {
+        showError('请拖放JSON文件');
+    }
+}
+
+// 3.3: 从文件加载干员数据 - 自动调用版本
+function loadOperatorsDataFromFile(file) {
+    showLoader();
+    
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const data = JSON.parse(e.target.result);
+            
+            // 验证数据格式
+            if (!Array.isArray(data)) {
+                throw new Error('JSON数据必须是数组格式');
+            }
+            
+            // 过滤掉未拥有的干员
+            operatorsData = data.filter(op => op.own !== false);
+            
+            // 检查必要字段
+            const requiredFields = ['id', 'name', 'elite', 'level', 'rarity'];
+            const missingFields = [];
+            const validOperators = [];
+            
+            operatorsData.forEach((op, index) => {
+                let isValid = true;
+                requiredFields.forEach(field => {
+                    if (op[field] === undefined) {
+                        missingFields.push(`干员 ${op.name || '未知'} (索引 ${index}) 缺少字段: ${field}`);
+                        isValid = false;
+                    }
+                });
+                
+                if (isValid) {
+                    // 确保own和potential字段存在
+                    if (op.own === undefined) op.own = true;
+                    if (op.potential === undefined) op.potential = 6;
+                    validOperators.push(op);
+                }
+            });
+            
+            operatorsData = validOperators;
+            
+            if (missingFields.length > 0) {
+                console.warn('数据格式警告:', missingFields);
+                updateLoadStatus(`数据加载完成，但有${missingFields.length}个格式警告`, 'warning');
+            }
+            
+            operatorCount.textContent = operatorsData.length;
+            selectBtn.disabled = operatorsData.length < 12;
+            
+            if (operatorsData.length < 12) {
+                const message = `干员数量不足12个（当前：${operatorsData.length}）`;
+                updateLoadStatus(message, 'warning');
+                showError(message);
+            } else {
+                const message = `成功加载 ${operatorsData.length} 个干员数据！已覆盖默认数据。`;
+                updateLoadStatus(message, 'success');
+                showSuccess(message);
+            }
+            
+            // 预加载所有干员图片到缓存
+            preloadOperatorImages();
+            
+            // 自动抽取一次
+            setTimeout(() => {
+                selectRandomOperators();
+            }, 500);
+            
+        } catch (error) {
+            console.error('解析JSON时出错:', error);
+            const message = `解析JSON时出错: ${error.message}`;
+            updateLoadStatus(message, 'error');
+            showError(message);
+            operatorsData = [];
+            operatorCount.textContent = '0';
+            selectBtn.disabled = true;
+        } finally {
+            hideLoader();
+        }
+    };
+    
+    reader.onerror = function() {
+        const message = '读取文件时出错';
+        updateLoadStatus(message, 'error');
+        showError(message);
+        hideLoader();
+    };
+    
+    reader.readAsText(file);
+}
+
+// 3.4: 修改现有的加载干员数据函数（可选保留，但不再使用）
+// 注意：这个函数现在不会被调用，但可以保留作为备份
+function loadOperatorsData() {
+    const file = fileInput.files[0];
+    if (!file) {
+        showError('请先选择文件');
+        return;
+    }
+    
+    loadOperatorsDataFromFile(file);
+}
 
 // 事件监听器
 document.addEventListener('DOMContentLoaded', () => {
@@ -32,34 +278,14 @@ document.addEventListener('DOMContentLoaded', () => {
     dropArea.addEventListener('dragover', handleDragOver);
     dropArea.addEventListener('drop', handleFileDrop);
     
-    // 按钮事件
-    loadBtn.addEventListener('click', loadOperatorsData);
+    // 3.5: 移除原加载按钮事件监听，保留其他按钮事件
+    // loadBtn.removeEventListener('click', loadOperatorsData);
+    
+    // 其他按钮事件
     selectBtn.addEventListener('click', selectRandomOperators);
     saveBtn.addEventListener('click', saveResultAsJson);
     clearBtn.addEventListener('click', clearResults);
 });
-
-// 处理文件选择
-function handleFileSelect(event) {
-    const file = event.target.files[0];
-    if (file) {
-        fileName.textContent = file.name;
-        loadBtn.disabled = false;
-        
-        // 预览文件内容
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            try {
-                const data = JSON.parse(e.target.result);
-                operatorCount.textContent = data.length;
-            } catch (error) {
-                showError('文件格式错误，请确保是有效的JSON文件');
-                loadBtn.disabled = true;
-            }
-        };
-        reader.readAsText(file);
-    }
-}
 
 // 处理拖放
 function handleDragOver(event) {
@@ -67,105 +293,6 @@ function handleDragOver(event) {
     event.stopPropagation();
     dropArea.style.borderColor = 'rgba(77, 204, 189, 0.6)';
     dropArea.style.backgroundColor = 'rgba(77, 204, 189, 0.05)';
-}
-
-function handleFileDrop(event) {
-    event.preventDefault();
-    event.stopPropagation();
-    dropArea.style.borderColor = 'rgba(77, 204, 189, 0.3)';
-    dropArea.style.backgroundColor = 'transparent';
-    
-    const file = event.dataTransfer.files[0];
-    if (file && file.type === 'application/json') {
-        fileInput.files = event.dataTransfer.files;
-        fileName.textContent = file.name;
-        loadBtn.disabled = false;
-        
-        // 预览文件内容
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            try {
-                const data = JSON.parse(e.target.result);
-                operatorCount.textContent = data.length;
-            } catch (error) {
-                showError('文件格式错误，请确保是有效的JSON文件');
-                loadBtn.disabled = true;
-            }
-        };
-        reader.readAsText(file);
-    } else {
-        showError('请拖放JSON文件');
-    }
-}
-
-// 加载干员数据
-function loadOperatorsData() {
-    const file = fileInput.files[0];
-    if (!file) {
-        showError('请先选择文件');
-        return;
-    }
-    
-    showLoader();
-    
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        try {
-            operatorsData = JSON.parse(e.target.result);
-            
-            // 验证数据格式
-            if (!Array.isArray(operatorsData)) {
-                throw new Error('JSON数据必须是数组格式');
-            }
-            
-            // 过滤掉未拥有的干员
-            operatorsData = operatorsData.filter(op => op.own !== false);
-            
-            // 检查必要字段
-            const requiredFields = ['id', 'name', 'elite', 'level', 'rarity'];
-            const missingFields = [];
-            
-            operatorsData.forEach((op, index) => {
-                requiredFields.forEach(field => {
-                    if (op[field] === undefined) {
-                        missingFields.push(`干员 ${op.name || '未知'} (索引 ${index}) 缺少字段: ${field}`);
-                    }
-                });
-            });
-            
-            if (missingFields.length > 0) {
-                console.warn('数据格式警告:', missingFields);
-            }
-            
-            operatorCount.textContent = operatorsData.length;
-            selectBtn.disabled = operatorsData.length < 12;
-            
-            if (operatorsData.length < 12) {
-                showError(`干员数量不足12个（当前：${operatorsData.length}）`);
-            } else {
-                showSuccess(`成功加载 ${operatorsData.length} 个干员数据！`);
-            }
-            
-            // 预加载所有干员图片到缓存
-            preloadOperatorImages();
-            
-        } catch (error) {
-            console.error('解析JSON时出错:', error);
-            showError(`解析JSON时出错: ${error.message}`);
-            operatorsData = [];
-            operatorCount.textContent = '0';
-            selectBtn.disabled = true;
-        } finally {
-            hideLoader();
-        }
-    };
-    
-    reader.onerror = function() {
-        showError('读取文件时出错');
-        hideLoader();
-    };
-    
-    reader.readAsText(file);
 }
 
 // 预加载干员图片
@@ -228,6 +355,18 @@ function selectRandomOperators() {
         op.selectedSkill = determineSkill(op);
     });
     
+    // 按照指定规则排序：elite降序 -> level降序 -> rarity降序
+    selectedOperators.sort((a, b) => {
+        // 1. 先按elite排序（数值越大越靠前）
+        if (b.elite !== a.elite) {return b.elite - a.elite;}
+        // 2. elite相同则按level排序（数值越大越靠前）
+        if (b.level !== a.level) {return b.level - a.level;}
+        // 3. level相同则按rarity排序（数值越大越靠前）
+        if (b.rarity !== a.rarity) {return b.rarity - a.rarity;}
+        // 4. 所有条件都相同，保持原顺序
+        return 0;
+    });
+
     // 更新UI
     updateResultsDisplay();
     updateJsonPreview();
@@ -559,16 +698,30 @@ function showError(message) {
     };
 })();
 
-// 初始化页面
+// 3.6: 修改页面初始化
 (function initPage() {
     // 设置文件拖放区域的默认文本
     dropArea.innerHTML = `
         <i class="fas fa-cloud-upload-alt upload-icon"></i>
-        <p>拖放您的JSON文件到此区域，或点击选择文件</p>
+        <p>通过MAA-小工具-干员识别</p>
+        <p>得到自己的干员box数据</p>
+        <p>MAA文件夹/data/OperBoxData.json</p>
+        <p>拖放文件到此，或点击选择文件</p>
+        <p class="default-data-info"><i class="fas fa-star"></i> 已自动加载默认全图鉴数据</p>
         <input type="file" id="file-input" accept=".json">
         <button class="btn" id="browse-btn">选择文件</button>
     `;
     
     // 初始JSON预览
     updateJsonPreview();
+    
+    // 初始化加载状态
+    if (loadStatusText) {
+        updateLoadStatus('正在初始化...', 'info');
+    }
+    
+    // 自动加载默认数据
+    setTimeout(() => {
+        loadDefaultData();
+    }, 500); // 稍微延迟加载，让页面先完全渲染
 })();

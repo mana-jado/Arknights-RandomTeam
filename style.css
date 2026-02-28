@@ -93,11 +93,45 @@ body {
     gap: 10px;
 }
 
+/* 加载状态样式 */
+.load-status {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    font-size: 0.9rem;
+    color: #a0a0c0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.load-status i {
+    color: #4dccbd;
+    animation: spin 2s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.load-success {
+    color: #06d6a0;
+}
+
+.load-error {
+    color: #ef476f;
+}
+
+.load-warning {
+    color: #ffd166;
+}
+
 /* 文件上传区域 */
 .file-upload-area {
     border: 2px dashed rgba(77, 204, 189, 0.3);
     border-radius: 10px;
-    padding: 40px 20px;
+    padding: 30px 20px;
     text-align: center;
     margin-bottom: 20px;
     cursor: pointer;
@@ -118,6 +152,8 @@ body {
 
 .file-upload-area p {
     margin-bottom: 20px;
+    line-height: 0.7;   /* 调整行高 */
+    font-size: 0.9rem;  /* 可选：稍微减小字体大小 */
     color: #b0b0d0;
 }
 
@@ -129,7 +165,8 @@ body {
     background: rgba(0, 0, 0, 0.2);
     border-radius: 8px;
     padding: 15px;
-    margin-bottom: 20px;
+    margin-bottom: 0px;
+    min-height: 100px; /* 确保有足够空间显示信息 */
 }
 
 .file-info p {
@@ -137,6 +174,29 @@ body {
     align-items: center;
     gap: 10px;
     margin-bottom: 8px;
+}
+.file-info p:first-child {
+    color: #4dccbd;
+    font-weight: 500;
+}
+
+/* 默认数据加载信息样式 */
+.default-data-info {
+    background: linear-gradient(135deg, rgba(77, 204, 189, 0.1) 0%, rgba(77, 204, 189, 0.05) 100%);
+    border: 1px solid rgba(77, 204, 189, 0.2);
+    border-radius: 8px;
+    padding: 8px 12px;
+    margin: 8px 0;
+    color: #4dccbd;
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+.default-data-info i {
+    font-size: 1.1rem;
 }
 
 /* 按钮样式 */
@@ -460,7 +520,8 @@ body {
 }
 
 /* 技能徽章 - 移动到名字右侧 */
-.skill-badge {
+/* 仅应用于干员卡片内的技能徽章 */
+.operator-header .skill-badge {
     position: absolute;
     top: 0;
     right: -8px; /* 稍微超出卡片边界 */
@@ -476,6 +537,24 @@ body {
     box-shadow: 0 3px 6px rgba(0, 0, 0, 0.3);
     border: 2px solid rgba(255, 255, 255, 0.2);
     z-index: 10; /* 确保在最上层 */
+}
+
+/* 保持技能图例中的徽章样式不变 */
+.skill-legend .skill-badge {
+    position: static; /* 恢复为静态定位 */
+    display: inline-flex; /* 行内弹性布局 */
+    align-items: center; /* 文字垂直居中 */
+    justify-content: center; /* 文字水平居中 */
+    width: 30px; /* 稍微小一点 */
+    height: 30px; /* 稍微小一点 */
+    border-radius: 50%; /* 关键：恢复为圆形 */
+    font-weight: bold;
+    color: white; /* 关键：恢复文字为白色 */
+    font-size: 0.9rem; /* 字号可稍小 */
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3); /* 阴影可稍淡 */
+    border: 2px solid rgba(255, 255, 255, 0.2); /* 恢复边框 */
+    margin-right: 5px; /* 右边距 */
+    vertical-align: middle; /* 与旁边文字垂直对齐 */
 }
 
 .skill-1 {
