@@ -257,8 +257,6 @@ function loadOperatorsDataFromFile(file) {
 
 function loadOperatorImage(operator, callback) {
     const eliteNum = operator.elite === 2 ? 2 : 1;
-    const imageName = `半身像_${operator.name}_${eliteNum}.png`;
-    const imagePath = `assets/images/${imageName}`;
     
     // 检查缓存
     if (operatorImages[operator.name] && operatorImages[operator.name].complete) {
@@ -266,34 +264,65 @@ function loadOperatorImage(operator, callback) {
         return;
     }
     
-    // 创建图片对象
-    const img = new Image();
-    
-    img.onload = function() {
-        operatorImages[operator.name] = img;
-        callback(img.src);
+    // 创建统一的图片加载函数
+    const tryLoadImage = (imageName, isFallback = false) => {
+        return new Promise((resolve) => {
+            const img = new Image();
+            
+            img.onload = function() {
+                if (!isFallback) {
+                    operatorImages[operator.name] = img;
+                }
+                resolve({ success: true, img: img });
+            };
+            
+            img.onerror = function() {
+                resolve({ success: false });
+            };
+            
+            const isWebP = imageName.endsWith('.webp');
+            const baseDir = isWebP ? 'assets/small_images/' : 'assets/images/';
+            img.src = baseDir + imageName;
+        });
     };
     
-    img.onerror = function() {
-        // 如果精英2图片不存在，回退到精英1图片
-        if (eliteNum === 2) {
-            const fallbackImageName = `半身像_${operator.name}_1.png`;
-            const fallbackImg = new Image();
-            fallbackImg.src = `assets/images/${fallbackImageName}`;
-            fallbackImg.onload = function() {
-                operatorImages[operator.name] = fallbackImg;
-                callback(fallbackImg.src);
-            };
-            fallbackImg.onerror = function() {
-                // 使用占位符
-                callback(getPlaceholderImage(operator));
-            };
-        } else {
+    // 定义尝试加载的顺序
+    const loadSequence = [
+        `半身像_${operator.name}_${eliteNum}.webp`,     // 1. 首选: WebP格式
+        `半身像_${operator.name}_${eliteNum}.png`,      // 2. 备选: PNG格式
+    ];
+    
+    // 如果是精英2，添加精英1的回退选项
+    if (eliteNum === 2) {
+        loadSequence.push(
+            `半身像_${operator.name}_1.webp`,           // 3. 回退: 精英1的WebP
+            `半身像_${operator.name}_1.png`             // 4. 回退: 精英1的PNG
+        );
+    }
+    
+    // 顺序尝试加载
+    const attemptLoad = async (index = 0) => {
+        if (index >= loadSequence.length) {
+            // 所有格式都失败，使用占位符
             callback(getPlaceholderImage(operator));
+            return;
+        }
+        
+        const imageName = loadSequence[index];
+        const isFallback = index >= 2; // 前两个是首选格式
+        
+        const result = await tryLoadImage(imageName, isFallback);
+        
+        if (result.success) {
+            callback(result.img.src);
+        } else {
+            // 当前格式失败，尝试下一个
+            attemptLoad(index + 1);
         }
     };
     
-    img.src = imagePath;
+    // 开始加载流程
+    attemptLoad();
 }
 
 function getPlaceholderImage(operator) {
